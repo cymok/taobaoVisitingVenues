@@ -15,32 +15,12 @@ function clickItemInCenter(item, time) {
 
 /**
  * 点击领喵币的按钮
- * @param delay 点击之后延迟多久进行下一个函数
  * @returns {number}
  */
-function openBeginningBtnItem(delay) {
-    let items = textStartsWith("gif;base64").depth(19).find();
-
-    console.log("寻找--领喵币");
-    if (items.length > 0) {
-        let item = items[items.length - 1];
-        console.log("点击--领喵币");
-        clickItemInCenter(item);
-        sleep(delay);
-        return 1;
-    }
-
-
-    if (items.length === 0) {
-        let go = text("领喵币").findOne(1000);
-        if (go != null) {
-            console.log("点击--领喵币");
-            clickItemInCenter(go);
-            sleep(delay);
-            return 1;
-        }
-    }
-    return -1;
+function openBeginningBtnItem() {
+    click(parseInt(deviceWidth * 0.88), parseInt(deviceWidth * 1.5));
+    sleep(1000);
+    return 1;
 }
 
 /**
@@ -48,7 +28,7 @@ function openBeginningBtnItem(delay) {
  * @returns {number}
  */
 function isOpenBeginning() {
-    let signIn = textContains("签到").findOnce();
+    let signIn = textContains("分享给好友").findOnce();
     if (signIn != null) {
         console.log("成功--打开领取中心");
         return 1;
@@ -65,6 +45,8 @@ function ensureOpenBeginning(waitDelay) {
     if (isOpenBeginning() === -1) {
         openBeginningBtnItem(waitDelay);
     }
+    if (isOpenBeginning() === 1) return 1;
+    sleep(2000);
     if (isOpenBeginning() === 1) return 1;
 
     console.error("失败--打开领取中心");
@@ -87,13 +69,13 @@ function checkIn(flag) {
             sleep(500);
         }
     }
-
 }
 
 /**
  * 向上滑动
  */
 function swipeUp(n) {
+    sleep(300);
     console.log("滑动屏幕");
     let x = parseInt(deviceWidth / 2);
     let duration = 500;
@@ -114,7 +96,7 @@ function isFull() {
             console.log("今日已达上限");
             return 1;
         }
-        sleep(200);
+        sleep(250);
     }
     return 0
 }
@@ -160,10 +142,15 @@ function judgeWay() {
         let directBrowseDesc = desc("浏览").findOnce();
         let directBrowseText = text("浏览").findOnce();
         if (directBrowseDesc != null || directBrowseText != null) {
-            if (descContains("00喵币").findOnce() != null || textContains("00喵币").findOnce() != null) {
+            if (descMatches(/.*?得\d{3,6}.*?/).findOnce() != null || textMatches(/.*?得\d{3,}/).findOnce() != null) {
                 console.log("已获取到正常浏览模式");
                 return 1;
             }
+        }
+
+        if (descMatches(/.*?已达上限|.*?已领/).findOnce() || textMatches(/.*?已达上限|.*?已领/).findOnce()) {
+            console.log("今日已达上限");
+            return -1;
         }
 
         sleep(delay);
@@ -178,17 +165,13 @@ function judgeWay() {
  * @returns {number}
  */
 function reopenAgain() {
-    console.log("reopen");
-    let tbs = id("taskBottomSheet").findOnce();
+    toastLog("重新打开（进行刷新界面）");
+    let tbs = className("Button").findOnce();
     if (tbs == null) return -1;
-    let close = tbs.child(1);
-    if (close != null) {
-        console.log("关闭");
-        clickItemInCenter(close);
-        sleep(1000);
-        return ensureOpenBeginning(2000);
-    }
-    return -1;
+    console.log("关闭");
+    clickItemInCenter(tbs);
+    sleep(1000);
+    return ensureOpenBeginning(2000);
 }
 
 /**
@@ -197,7 +180,7 @@ function reopenAgain() {
  */
 function clickGoBrowse(n) {
     // 寻找-去浏览-的按钮
-    let browse = text("去浏览").findOne(1000);
+    let browse = textMatches(/.*?去*[览索]/).findOne(1000);
     if (browse != null) {
         let guessYouLike = textContains("猜你喜欢").findOnce(); //寻找-猜你喜欢-的按钮
 
@@ -206,13 +189,13 @@ function clickGoBrowse(n) {
             console.log("出现猜你喜欢");
 
             // 这里判断控件的 top 坐标是否一样（其实我也不知道直接判断控件是否一样行不行）
-            let pp = browse.parent().bounds().top;
-            let ppp = guessYouLike.parent().parent().bounds().top;
+            let pp = browse.bounds().top;
+            let ppp = guessYouLike.bounds().top;
             if (ppp === pp) {
                 console.log("跳过--猜你喜欢");
-                let allBrowse = text("去浏览").find();
+                let allBrowse = textMatches(/.*?去*[览索]/).find();
 
-                // 如果仅剩下一个-去浏览-的按钮，并且外圈循环重复不到 2 次，那就进行返回 0 进行 reopen()
+                // 如果仅剩下一个-去浏览/去搜索-的按钮，并且外圈循环重复不到 2 次，那就进行返回 0 进行 reopen()
                 if (allBrowse.length <= 1 && n <= 1) {
                     return 0;
                 }
@@ -229,6 +212,11 @@ function clickGoBrowse(n) {
 
         console.log("点击--去浏览");
         clickItemInCenter(browse);
+
+        if (guessYouLike != null && n >= 2) {
+            console.log("可能回到首页了，等待三秒");
+            return 2;
+        }
         return 1;
     }
     return -1;
@@ -242,7 +230,7 @@ function clickSkip() {
     if (skip != null) {
         console.log("滑动跳过");
         swipeUp(1);
-    }else console.log("无广告");
+    } else console.log("无广告");
 }
 
 /**
@@ -265,6 +253,11 @@ function runGoBrowse() {
         for (let j = 0; j < 3; j++) {
             isSuccess = clickGoBrowse(j);
             if (isSuccess !== 1) {
+
+                if (isSuccess === 2) {
+                    openBeginningBtnItem();
+                    sleep(3000);
+                }
                 reopenAgain();
             } else break;
         }
@@ -280,8 +273,7 @@ function runGoBrowse() {
 
         // 进行滑动。如果是滑动的话，就是店铺，判断是否有店铺签到的操作。
         if (jw === 0) {
-            checkIn(isCheckIn);
-            swipeUp(2);
+            swipeUp(1);
         } else if (jw === -1) { //如果没有滑动浏览，那就可能不需要，或者浏览到上限了
             if (isFull() === 1) { // 这里的最多延时 2s
                 console.log("已达上限");
@@ -297,8 +289,8 @@ function runGoBrowse() {
             console.log("10s");
             sleep(1000 * 10);
         } else {
-            console.log("14s");
-            sleep(1000 * 14);
+            console.log("14.5s");
+            sleep(1000 * 14.5);
         }
 
 
@@ -333,6 +325,17 @@ function backToBefore() {
     }
 }
 
+function isAtHomePage() {
+    let myTaobao = desc("我的淘宝").findOnce();
+    if (myTaobao != null) {
+        console.log("回到淘宝首页，等三秒");
+        openBeginningBtnItem();
+        sleep(3000);
+        return 1;
+    }
+    return 0;
+}
+
 function removeFile(fileName) {
     if (files.exists(fileName)) {
         files.remove(fileName);
@@ -352,7 +355,7 @@ function runRun() {
 
     let statue = runGoBrowse();
     toastLog("去浏览--浏览结束");
-    alert("结束");
+    alert("结束\n(如果点击猜你喜欢去首页，那么离开了主界面会被判定结束了，需要再次运行)");
 }
 
 function moveFloating(n) {
@@ -424,3 +427,4 @@ function runChoose(n) {
 }
 
 module.exports = runChoose;
+// runChoose();
